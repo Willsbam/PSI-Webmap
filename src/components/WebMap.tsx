@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import type { TnmItem } from '../types'
 import SearchBar from './SearchBar'
 import ResultsLayer from './ResultsLayer'
+import LinkDownloader from './linkDownloader'
 import './WebMap.css'
 
 const US_BOUNDS: LatLngBoundsExpression = [
@@ -59,6 +60,9 @@ function WebMap({ points, items, selectedItemId, onAddPoint, onReset, onSelectIt
         <SearchBar />
         <PolygonDrawer points={points} onAddPoint={onAddPoint} dataLoaded={items.length > 0} />
         <ResultsLayer items={items} selectedItemId={selectedItemId} onSelectItem={onSelectItem} />
+
+        <LinkDownloader />
+
       </MapContainer>
 
       {points.length > 0 && (

@@ -1,0 +1,21 @@
+.firm-status {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  z-index: 1000;
+  max-width: 320px;
+}
+
+.firm-status .hint.error {
+  background: rgba(200, 40, 40, 0.85);
+}
+
+.firm-status .hint.muted {
+  background: rgba(8, 6, 13, 0.5);
+}
+.hint-list{
+  margin: 0;
+  margin-left: 16px;
+  padding: 2px;
+  list-style: none;
+}

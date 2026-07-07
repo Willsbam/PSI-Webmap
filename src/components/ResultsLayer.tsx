@@ -7,7 +7,7 @@ import type { FeatureCollection, Polygon } from 'geojson'
 import type { TnmBoundingBox, TnmItem } from '../types'
 
 // Above this many visible items, individual rectangles give way to a merged coverage shape.
-const MERGE_THRESHOLD = 500
+const MERGE_THRESHOLD = 1000
 // Cull/coverage bounds are padded beyond the viewport so edge items don't pop in mid-pan.
 const CULL_PAD = 0.5
 // Fraction of the viewport the map must move/rescale before culling recomputes.
