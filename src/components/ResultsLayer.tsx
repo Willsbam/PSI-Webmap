@@ -131,7 +131,6 @@ function ResultsLayer({ items, selectedItemId, onSelectItem }: ResultsLayerProps
   )
 
   const shouldMerge = visibleItems.length > MERGE_THRESHOLD
-
   const coverage = useMemo(
     () => (shouldMerge ? buildCoverage(items, cullBounds) : null),
     [shouldMerge, items, cullBounds],

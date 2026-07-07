@@ -1,52 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LatLngTuple } from 'leaflet'
+import type { FeatureCollection } from 'geojson'
 import WebMap from './components/WebMap'
 import SidePanel from './components/SidePanel'
 import type { TnmItem } from './types'
-
-const MAX_RETRIES = 5
-const REQUEST_TIMEOUT_MS = 10000
-const MAX_RETURN = 1000
-
-async function fetchWithTimeout(url: string, timeoutMs: number) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await fetch(url, { signal: controller.signal })
-  } finally {
-    clearTimeout(timer)
-  }
-}
-
-//https://tnmaccess.nationalmap.gov/api/v1/docs for documentaton
-//Note is that API is limited to 10,000 results in one go, putting my own cap if I want to throttle the API a bit more
-function buildProductsUrl(polygon: string, offset: number) {
-  return (
-    'https://tnmaccess.nationalmap.gov/api/v1/products' +
-    `?polygon=${encodeURIComponent(polygon)}` +
-    `&datasets=${encodeURIComponent('Lidar Point Cloud (LPC)')}` +
-    `&max=${MAX_RETURN}` +
-    `&offset=${offset}` +
-    `&outputFormat=JSON`
-  )
-}
-
-async function fetchProductsBatch(url: string): Promise<{ total: number; items: TnmItem[] }> {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
-    try {
-      const res = await fetchWithTimeout(url, REQUEST_TIMEOUT_MS)
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-      return await res.json()
-    } catch (err) {
-      const timedOut = err instanceof DOMException && err.name === 'AbortError'
-      if (!timedOut || attempt === MAX_RETRIES) {
-        throw timedOut ? new Error(`The National Map API timed out after ${MAX_RETRIES} attempts.`) : err
-      }
-    }
-  }
-  throw new Error('Failed to fetch data')
-}
-
+import * as nwf from './lib/nwf'
 function App() {
   //Networking is all handled at this top app level
   const [points, setPoints] = useState<LatLngTuple[]>([])
@@ -55,7 +13,8 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
-
+  const [floodCoordinates, setFloodCoordinates] = useState<FeatureCollection | null>(null)
+  const [floodKey, setFloodKey] = useState(0)
   //0 -  nothing loaded, 1 loading, 2 - loaded,
   const loadState = useRef(0)
 
@@ -75,9 +34,11 @@ function App() {
     setError(null)
     setPanelOpen(false)
     setSelectedItemId(null)
+    setFloodCoordinates(null)
   }
 
-  const queryNationalMap = useCallback(async () => {
+  const processSelection = useCallback(async () => 
+    {
     if (points.length < 3) return
 
     const polygon = points.map(([lat, lng]) => `${lng} ${lat}`).join(',')
@@ -92,11 +53,12 @@ function App() {
     let offset = 0
     let remoteTotal = Infinity
 
-    //This is in charge of batching logic
+    //This is in charge of batching logic for TNM
+    //Utilized for Lidar and NAIP imagery
     try {
       
       while (offset < remoteTotal && loadState.current === 1) {
-        const data = await fetchProductsBatch(buildProductsUrl(polygon, offset))
+        const data = await nwf.fetchProductsBatch(nwf.buildProductsUrl(polygon, offset))
         //Reason there are two checks for loading is that the var can be set AS loading is set
         //So this could return a batch of data when it shouldn't otherwise
         if(loadState.current !== 1)return
@@ -105,22 +67,48 @@ function App() {
         // console.log(data.total)s
         //Expands the previous list with new items
         setItems((prev) => [...prev, ...(data.items ?? [])])
-        offset += MAX_RETURN
+        offset += nwf.MAX_RETURN
       }
       loadState.current = 2
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data')
       loadState.current = 0
+
     } 
+
+    let ring = nwf.toClockwiseRing(points.map(([lat, lng]) => [lng, lat]))
+
+    // Close the ring if it isn't already. Compare by coordinate value — the old
+    // reference check (loopedPoints[0] != loopedPoints[len-1]) was always true.
+    const first = ring[0]
+    const last = ring[ring.length - 1]
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      ring = [...ring, first]
+    }
+
+    const geometry = encodeURIComponent(
+      JSON.stringify({
+        rings: [ring],
+        spatialReference: { wkid: 4326 },
+      }),
+    )
+
+        const url = `https://hazards.fema.gov/arcgis/rest/services/public/NFHLWMS/MapServer/28/query?geometry=${geometry}&geometryType=esriGeometryPolygon&outFields=*&returnGeometry=true&f=geoJSON`;
+        const geoJSON = (await (await nwf.fetchWithTimeout(url, nwf.REQUEST_TIMEOUT_MS)).json()) as FeatureCollection
+        setFloodCoordinates(geoJSON)
+        setFloodKey((k) => k + 1)
+
+
+
   }, [points])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') queryNationalMap()
+      if (e.key === 'Enter') processSelection()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [queryNationalMap])
+  }, [processSelection])
 
   //Webmap handles the drawing of the polygon and the points,
   //Actual query is handled here, and then data displayed in sidepanel when there is data to displacy
@@ -133,6 +121,8 @@ function App() {
         onAddPoint={handleAddPoint}
         onReset={handleReset}
         onSelectItem={handleSelectItem}
+        floodCoordinates={floodCoordinates}
+        floodKey={floodKey}
       />
       {panelOpen && (
         <SidePanel

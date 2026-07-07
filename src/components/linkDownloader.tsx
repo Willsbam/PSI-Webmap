@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Marker, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import type { LatLngTuple } from 'leaflet'
-import { fetchAndDownloadFirm } from '../lib/firm'
+import { fetchAndDownloadFirm } from '../lib/nwf'
 import './linkDownloader.css'
 
 type FirmStatus = 'idle' | 'loading' | 'error'

@@ -1,5 +1,6 @@
-import { MapContainer, Polygon, TileLayer, useMapEvents } from 'react-leaflet'
+import { GeoJSON, MapContainer, Polygon, TileLayer, useMapEvents } from 'react-leaflet'
 import type { LatLngBoundsExpression, LatLngTuple } from 'leaflet'
+import type { FeatureCollection } from 'geojson'
 import 'leaflet/dist/leaflet.css'
 import type { TnmItem } from '../types'
 import SearchBar from './SearchBar'
@@ -11,6 +12,7 @@ const US_BOUNDS: LatLngBoundsExpression = [
   [15, -170],
   [72, -50],
 ]
+
 
 interface PolygonDrawerProps {
   points: LatLngTuple[]
@@ -40,9 +42,11 @@ interface WebMapProps {
   onAddPoint: (point: LatLngTuple) => void
   onReset: () => void
   onSelectItem: (id: string) => void
+  floodCoordinates: FeatureCollection | null
+  floodKey: number
 }
 
-function WebMap({ points, items, selectedItemId, onAddPoint, onReset, onSelectItem }: WebMapProps) {
+function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,floodCoordinates,floodKey,}: WebMapProps) {
   return (
     <div id="map-shell">
       <MapContainer
@@ -60,6 +64,8 @@ function WebMap({ points, items, selectedItemId, onAddPoint, onReset, onSelectIt
         <SearchBar />
         <PolygonDrawer points={points} onAddPoint={onAddPoint} dataLoaded={items.length > 0} />
         <ResultsLayer items={items} selectedItemId={selectedItemId} onSelectItem={onSelectItem} />
+
+        {floodCoordinates && <GeoJSON key={floodKey} data={floodCoordinates} style={FLOOD_STYLE} />}
 
         <LinkDownloader />
 
