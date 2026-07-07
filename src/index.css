@@ -1,0 +1,11 @@
+:root {
+  color-scheme: light dark;
+  font: 16px/145% system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
