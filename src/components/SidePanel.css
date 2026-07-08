@@ -100,3 +100,23 @@
 .item-list a:hover {
   text-decoration: underline;
 }
+
+.side-panel-tabs{
+  display: flex;
+    flex-shrink: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    height: 40px;
+    gap:5px;
+    margin-left:5px;
+    border-bottom: 1px solid #e5e4e7;
+
+}
+.selection-buttons{
+  padding: 3px 10px 3px 10px;
+    font-size: large;
+    background-color: rgb(94, 94, 212);
+
+}

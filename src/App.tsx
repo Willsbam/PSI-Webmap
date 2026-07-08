@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { LatLngTuple } from 'leaflet'
-import type { FeatureCollection } from 'geojson'
 import WebMap from './components/WebMap'
 import SidePanel from './components/SidePanel'
-import type { TnmItem } from './types'
+import type { GISDataset, TnmItem } from './types'
 import * as nwf from './lib/nwf'
 function App() {
   //Networking is all handled at this top app level
@@ -13,8 +12,16 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
-  const [floodCoordinates, setFloodCoordinates] = useState<FeatureCollection | null>(null)
-  const [floodKey, setFloodKey] = useState(0)
+  const [gisDatasets, setGisDatasets] = useState<GISDataset[]>([])
+  // GIS/shapefile errors are kept separate from `error` (which is TNM/Lidar) so
+  // they surface under the Shapefiles tab rather than the Lidar tab.
+  const [gisError, setGisError] = useState<string | null>(null)
+  // The GIS fetch runs after the TNM loop, so it needs its own loading flag —
+  // loadState (TNM/Lidar) reaching 2 doesn't mean the GIS datasets are in yet.
+  const [gisLoading, setGisLoading] = useState(false)
+  // react-leaflet's <GeoJSON> doesn't diff `data` after mount, so bump this on
+  // each fetch to force a remount with the new coverage.
+  const [gisKey, setGisKey] = useState(0)
   //0 -  nothing loaded, 1 loading, 2 - loaded,
   const loadState = useRef(0)
 
@@ -34,7 +41,9 @@ function App() {
     setError(null)
     setPanelOpen(false)
     setSelectedItemId(null)
-    setFloodCoordinates(null)
+    setGisDatasets([])
+    setGisError(null)
+    setGisLoading(false)
   }
 
   const processSelection = useCallback(async () => 
@@ -47,6 +56,8 @@ function App() {
     setTotal(null)
     loadState.current = 1
     setError(null)
+    setGisError(null)
+    setGisLoading(true)
     setPanelOpen(true)
     setSelectedItemId(null)
 
@@ -76,31 +87,15 @@ function App() {
 
     } 
 
-    let ring = nwf.toClockwiseRing(points.map(([lat, lng]) => [lng, lat]))
-
-    // Close the ring if it isn't already. Compare by coordinate value — the old
-    // reference check (loopedPoints[0] != loopedPoints[len-1]) was always true.
-    const first = ring[0]
-    const last = ring[ring.length - 1]
-    if (first[0] !== last[0] || first[1] !== last[1]) {
-      ring = [...ring, first]
-    }
-
-    const geometry = encodeURIComponent(
-      JSON.stringify({
-        rings: [ring],
-        spatialReference: { wkid: 4326 },
-      }),
-    )
-
-        const url = `https://hazards.fema.gov/arcgis/rest/services/public/NFHLWMS/MapServer/28/query?geometry=${geometry}&geometryType=esriGeometryPolygon&outFields=*&returnGeometry=true&f=geoJSON`;
-        const geoJSON = (await (await nwf.fetchWithTimeout(url, nwf.REQUEST_TIMEOUT_MS)).json()) as FeatureCollection
-        setFloodCoordinates(geoJSON)
-        setFloodKey((k) => k + 1)
-
-
-
+    //Every dataset registered in nwf.GIS_DATASETS is fetched for the AOI and
+    //drawn as a GeoJSON overlay by WebMap
+    const { datasets, errors } = await nwf.fetchGISDatasets(points)
+    setGisDatasets(datasets)
+    setGisKey((k) => k + 1)
+    if (errors.length) setGisError(errors.join('; '))
+    setGisLoading(false)
   }, [points])
+
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -121,8 +116,8 @@ function App() {
         onAddPoint={handleAddPoint}
         onReset={handleReset}
         onSelectItem={handleSelectItem}
-        floodCoordinates={floodCoordinates}
-        floodKey={floodKey}
+        gisDatasets={gisDatasets}
+        gisKey={gisKey}
       />
       {panelOpen && (
         <SidePanel
@@ -130,6 +125,9 @@ function App() {
           total={total}
           loading={loadState.current}
           error={error}
+          gisDatasets={gisDatasets}
+          gisError={gisError}
+          gisLoading={gisLoading}
           selectedItemId={selectedItemId}
           onSelectItem={handleSelectItem}
           onClose={() => setPanelOpen(false)}

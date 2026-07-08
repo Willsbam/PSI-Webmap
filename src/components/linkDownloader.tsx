@@ -5,6 +5,7 @@ import type { LatLngTuple } from 'leaflet'
 import { fetchAndDownloadFirm } from '../lib/nwf'
 import './linkDownloader.css'
 
+
 type FirmStatus = 'idle' | 'loading' | 'error'
 
 const redPinIcon = L.divIcon({
@@ -23,7 +24,6 @@ function LinkDownloader() {
   const [firmURL, setFirmURL] = useState<string | null>(null)
   const [point, setPoint] = useState<LatLngTuple | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -33,6 +33,8 @@ function LinkDownloader() {
 
   useMapEvents({
     async contextmenu(e) {
+
+
       setPoint([e.latlng.lat, e.latlng.lng])
       setStatus('loading')
       setError(null)
@@ -56,12 +58,15 @@ function LinkDownloader() {
       {status === 'loading' && <div className="hint">Fetching data</div>}
       {status === 'error' && <div className="hint error">{error}</div>}
 
-      {status === 'idle' && firmURL ? (
-        <div className="hint muted">Available downloads for the selected point:
+      {status === 'idle' && firmURL 
+      ? (
+        <div className="hint muted">
+          Available downloads for the selected point:
           <ul className="hint-list">
             <a href={firmURL} target="_blank" rel="noreferrer">
               FEMA Flood Map
             </a>
+           
           </ul> 
         </div>
       )
@@ -69,10 +74,11 @@ function LinkDownloader() {
       <div className="hint muted">Right-click the map to download supported point data:
           <ul className="hint-list">
             FEMA Flood Map
-          </ul> 
+          </ul>
         </div>
       }
 
+      
     </div>
     </>
   )

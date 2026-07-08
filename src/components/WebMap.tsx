@@ -1,12 +1,12 @@
 import { GeoJSON, MapContainer, Polygon, TileLayer, useMapEvents } from 'react-leaflet'
 import type { LatLngBoundsExpression, LatLngTuple } from 'leaflet'
-import type { FeatureCollection } from 'geojson'
 import 'leaflet/dist/leaflet.css'
-import type { TnmItem } from '../types'
+import type { GISDataset, TnmItem } from '../types'
 import SearchBar from './SearchBar'
 import ResultsLayer from './ResultsLayer'
 import LinkDownloader from './linkDownloader'
 import './WebMap.css'
+
 
 const US_BOUNDS: LatLngBoundsExpression = [
   [15, -170],
@@ -42,11 +42,11 @@ interface WebMapProps {
   onAddPoint: (point: LatLngTuple) => void
   onReset: () => void
   onSelectItem: (id: string) => void
-  floodCoordinates: FeatureCollection | null
-  floodKey: number
+  gisDatasets: GISDataset[]
+  gisKey: number
 }
 
-function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,floodCoordinates,floodKey,}: WebMapProps) {
+function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,}: WebMapProps) {
   return (
     <div id="map-shell">
       <MapContainer
@@ -65,10 +65,12 @@ function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,flo
         <PolygonDrawer points={points} onAddPoint={onAddPoint} dataLoaded={items.length > 0} />
         <ResultsLayer items={items} selectedItemId={selectedItemId} onSelectItem={onSelectItem} />
 
-        {floodCoordinates && <GeoJSON key={floodKey} data={floodCoordinates} style={FLOOD_STYLE} />}
+        {gisDatasets.map((dataset) => (
+          <GeoJSON key={`${dataset.id}:${gisKey}`} data={dataset.data} style={dataset.style} />
+        ))}
+
 
         <LinkDownloader />
-
       </MapContainer>
 
       {points.length > 0 && (

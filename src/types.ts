@@ -1,5 +1,3 @@
-import { GeoJSON, MapContainer, Polygon, TileLayer, useMapEvents } from 'react-leaflet'
-import type { LatLngBoundsExpression, LatLngTuple } from 'leaflet'
 import type { FeatureCollection } from 'geojson'
 
 export interface TnmBoundingBox {
@@ -18,18 +16,26 @@ export interface TnmItem {
   downloadURL: string
   boundingBox?: TnmBoundingBox
 }
-export interface GISStyle{
-  color: string; 
-  weight: number; 
-  fillColor: string; 
-  fillOpacity: number 
+
+export interface GISStyle {
+  color: string
+  weight: number
+  fillColor: string
+  fillOpacity: number
 }
 
-export interface GISDatasets {
-  datasets: FeatureCollection[]
-  datasetStyles: GISStyle[]
+// Definition of an AOI-driven GeoJSON overlay: given the user's polygon as an
+// encoded Esri `rings` geometry, produce the query URL. Registered definitions
+// (see GIS_DATASETS in lib/nwf.ts) are fetched and drawn automatically.
+export interface GISDatasetDef {
+  id: string
+  style: GISStyle
+  buildUrl: (geometry: string) => string
 }
 
-
-
-
+// A fetched dataset, paired with its style, ready for the map.
+export interface GISDataset {
+  id: string
+  style: GISStyle
+  data: FeatureCollection
+}

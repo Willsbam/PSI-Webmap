@@ -1,5 +1,9 @@
 //nwf networking functions
 
+import type { LatLngTuple } from 'leaflet'
+import type { FeatureCollection } from 'geojson'
+import type { GISDataset, GISDatasetDef, TnmItem } from '../types'
+
 interface FirmFeature {
   attributes: {
     FIRM_PAN: string
@@ -106,3 +110,61 @@ export function toClockwiseRing(coords: number[][]): number[][] {
   }
   return area > 0 ? [...coords].reverse() : coords
 }
+
+// AOI [lat, lng] points -> URL-encoded Esri `rings` geometry (clockwise, closed).
+export function buildAoiGeometry(points: LatLngTuple[]): string {
+  let ring = toClockwiseRing(points.map(([lat, lng]) => [lng, lat]))
+
+  const first = ring[0]
+  const last = ring[ring.length - 1]
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring = [...ring, first]
+  }
+
+  return encodeURIComponent(
+    JSON.stringify({
+      rings: [ring],
+      spatialReference: { wkid: 4326 },
+    }),
+  )
+}
+
+// Registry of GeoJSON overlays drawn for the user's AOI. To add a new dataset,
+// append an entry: `buildUrl` receives the AOI as an encoded Esri polygon and
+// must return a URL whose response is GeoJSON. Fetching, state, and map
+// rendering are handled automatically from there.
+export const GIS_DATASETS: GISDatasetDef[] = [
+  {
+    id: 'fema-flood-hazard',
+    style: { color: '#2563eb', weight: 1, fillColor: '#3b82f6', fillOpacity: 0.3 },
+    buildUrl: (geometry) =>
+      'https://hazards.fema.gov/arcgis/rest/services/public/NFHLWMS/MapServer/28/query' +
+      `?geometry=${geometry}&geometryType=esriGeometryPolygon&inSR=4326&outFields=*&returnGeometry=true&f=geoJSON`,
+  },
+]
+
+// Fetches every registered dataset for the AOI. One dataset failing doesn't
+// block the others; failures are reported via the returned `errors`.
+export async function fetchGISDatasets(
+  points: LatLngTuple[],
+): Promise<{ datasets: GISDataset[]; errors: string[] }> {
+  const geometry = buildAoiGeometry(points)
+
+  const results = await Promise.allSettled(
+    GIS_DATASETS.map(async (def): Promise<GISDataset> => {
+      const res = await fetchWithTimeout(def.buildUrl(geometry), REQUEST_TIMEOUT_MS)
+      if (!res.ok) throw new Error(`${def.id} request failed: ${res.status}`)
+      const data = (await res.json()) as FeatureCollection
+      return { id: def.id, style: def.style, data }
+    }),
+  )
+
+  const datasets: GISDataset[] = []
+  const errors: string[] = []
+  results.forEach((result, i) => {
+    if (result.status === 'fulfilled') datasets.push(result.value)
+    else errors.push(`${GIS_DATASETS[i].id}: ${result.reason instanceof Error ? result.reason.message : 'request failed'}`)
+  })
+  return { datasets, errors }
+}
+
