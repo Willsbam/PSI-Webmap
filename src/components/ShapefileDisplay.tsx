@@ -69,7 +69,8 @@ function ShapefileDisplay({ gisDatasets, loading, error, onToggleDataset }: Shap
           const visible = gisDatasets.find((d) => d.id === file.id)?.visibile ?? true
           return (
             <li key={file.id}>
-              <button type="button" onClick={() => onToggleDataset(file.id)}>
+              <button type="button" className="shpToggle" style={{backgroundColor: visible ? 'rgb(58, 58, 141)': ' #aa3bff'}}
+               onClick={() => onToggleDataset(file.id)}>
                 {visible ? 'Hide on map' : 'Show on map'}
               </button>
 

@@ -117,6 +117,13 @@
 .selection-buttons{
   padding: 3px 10px 3px 10px;
     font-size: large;
-    background-color: rgb(94, 94, 212);
-
+    background-color: #aa3bff;
+    border-radius: 5px;
+    border: none;
+}
+.shpToggle
+{
+     background-color: #aa3bff;
+    border-radius: 3px;
+    border: none;
 }
