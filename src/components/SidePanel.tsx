@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { GISDataset, TnmItem } from '../types'
 import './SidePanel.css'
 import LidarData from './LidarDataDisplay'
@@ -13,15 +13,16 @@ interface SidePanelProps {
   gisDatasets: GISDataset[]
   gisError: string | null
   gisLoading: boolean
+  onToggleDataset: (id: string) => void
+  activeTab: 'lidar' | 'shapefiles'
+  onSelectTab: (tab: 'lidar' | 'shapefiles') => void
   selectedItemId: string | null
   onSelectItem: (id: string) => void
   onClose: () => void
 }
 
-function SidePanel({ items, total, loading, error, gisDatasets, gisError, gisLoading, selectedItemId, onSelectItem, onClose }: SidePanelProps) {
+function SidePanel({ items, total, loading, error, gisDatasets, gisError, gisLoading, onToggleDataset, activeTab, onSelectTab, selectedItemId, onSelectItem, onClose }: SidePanelProps) {
   const itemRefs = useRef(new Map<string, HTMLLIElement>())
-
-  const [dataDisplay, setDataDisplay] = useState<'lidar' | 'shapefiles'>('lidar')
 
   useEffect(() => {
     if (!selectedItemId) return
@@ -37,15 +38,15 @@ function SidePanel({ items, total, loading, error, gisDatasets, gisError, gisLoa
         </button>
       </div>
       <div className="side-panel-tabs">
-          <button className="selection-buttons" style={{backgroundColor: dataDisplay === 'lidar' ? 'rgb(58, 58, 141)' : 'rgb(94, 94, 212)'}} onClick={() => setDataDisplay('lidar')}>
+          <button className="selection-buttons" style={{backgroundColor: activeTab === 'lidar' ? 'rgb(58, 58, 141)' : 'rgb(94, 94, 212)'}} onClick={() => onSelectTab('lidar')}>
             Lidar
           </button>
-          <button className="selection-buttons" style={{backgroundColor: dataDisplay === 'shapefiles' ? 'rgb(58, 58, 141)' : 'rgb(94, 94, 212)'}} onClick={() => setDataDisplay('shapefiles')}>
+          <button className="selection-buttons" style={{backgroundColor: activeTab === 'shapefiles' ? 'rgb(58, 58, 141)' : 'rgb(94, 94, 212)'}} onClick={() => onSelectTab('shapefiles')}>
             Shapefiles
           </button>
 
       </div>
-      {dataDisplay === 'lidar' && (
+      {activeTab === 'lidar' && (
         <div>
           <LidarData
             items={items}
@@ -58,9 +59,9 @@ function SidePanel({ items, total, loading, error, gisDatasets, gisError, gisLoa
         </div>
       )}
 
-      {dataDisplay === 'shapefiles' && (
+      {activeTab === 'shapefiles' && (
         <div>
-          <ShapefileDisplay gisDatasets={gisDatasets} loading={gisLoading} error={gisError} />
+          <ShapefileDisplay gisDatasets={gisDatasets} loading={gisLoading} error={gisError} onToggleDataset={onToggleDataset} />
         </div>
       )}
     </aside>

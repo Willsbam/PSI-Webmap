@@ -7,12 +7,14 @@ interface ShapefileDisplayProps {
   gisDatasets: GISDataset[]
   loading: boolean
   error: string | null
+  onToggleDataset: (id: string) => void
 }
 
 // Renders a downloadable shapefile (.zip) per GIS dataset. Zipping is generic:
 // any GISDataset registered in nwf.GIS_DATASETS flows through here unchanged.
-function ShapefileDisplay({ gisDatasets, loading, error }: ShapefileDisplayProps) {
+function ShapefileDisplay({ gisDatasets, loading, error, onToggleDataset }: ShapefileDisplayProps) {
   const [shapefiles, setShapefiles] = useState<{ id: string; url: string }[]>([])
+
   const [zipError, setZipError] = useState<string | null>(null)
   const [zipping, setZipping] = useState(false)
 
@@ -63,14 +65,21 @@ function ShapefileDisplay({ gisDatasets, loading, error }: ShapefileDisplayProps
         <p className="status">No shapefile datasets found for this area.</p>
       )}
       <ul className="item-list">
-        {shapefiles.map((file) => (
-          <li key={file.id}>
-            <p className="item-title">{file.id}</p>
-            <a href={file.url} download={`${file.id}.zip`}>
-              Download shapefile (.zip)
-            </a>
-          </li>
-        ))}
+        {shapefiles.map((file) => {
+          const visible = gisDatasets.find((d) => d.id === file.id)?.visibile ?? true
+          return (
+            <li key={file.id}>
+              <button type="button" onClick={() => onToggleDataset(file.id)}>
+                {visible ? 'Hide on map' : 'Show on map'}
+              </button>
+
+              <p className="item-title">{file.id}</p>
+              <a href={file.url} download={`${file.id}.zip`}>
+                Download shapefile (.zip)
+              </a>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )

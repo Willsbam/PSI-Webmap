@@ -22,6 +22,9 @@ function App() {
   // react-leaflet's <GeoJSON> doesn't diff `data` after mount, so bump this on
   // each fetch to force a remount with the new coverage.
   const [gisKey, setGisKey] = useState(0)
+  // Which data tab is active. Drives both the side panel and which layers the
+  // map renders — lidar coverage is hidden while on the shapefiles tab.
+  const [activeTab, setActiveTab] = useState<'lidar' | 'shapefiles'>('lidar')
   //0 -  nothing loaded, 1 loading, 2 - loaded,
   const loadState = useRef(0)
 
@@ -31,6 +34,10 @@ function App() {
 
   const handleSelectItem = useCallback((id: string) => {
     setSelectedItemId((prev) => (prev === id ? null : id))
+  }, [])
+
+  const handleToggleDataset = useCallback((id: string) => {
+    setGisDatasets((prev) => prev.map((d) => (d.id === id ? { ...d, visibile: !d.visibile } : d)))
   }, [])
 
   const handleReset = () => {
@@ -118,6 +125,7 @@ function App() {
         onSelectItem={handleSelectItem}
         gisDatasets={gisDatasets}
         gisKey={gisKey}
+        showLidar={activeTab === 'lidar'}
       />
       {panelOpen && (
         <SidePanel
@@ -128,6 +136,9 @@ function App() {
           gisDatasets={gisDatasets}
           gisError={gisError}
           gisLoading={gisLoading}
+          onToggleDataset={handleToggleDataset}
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
           selectedItemId={selectedItemId}
           onSelectItem={handleSelectItem}
           onClose={() => setPanelOpen(false)}

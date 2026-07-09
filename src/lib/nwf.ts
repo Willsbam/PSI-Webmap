@@ -65,6 +65,37 @@ export async function fetchWithTimeout(url: string, timeoutMs: number) {
   }
 }
 
+interface RetryOptions<T> {
+  validate: (body: unknown) => T
+  label?: string
+  timeoutMs?: number
+  retries?: number
+}
+
+// Shared fetch + retry with linear backoff. `validate` runs on the parsed body
+// and MUST throw if it's unusable — critically, ArcGIS commonly returns HTTP 200
+// with an `{ error }` payload instead of data on transient failures. Validating
+// the body (not just res.ok) is what lets those be retried instead of silently
+// passing through as empty/garbage results.
+async function fetchJsonWithRetry<T>(url: string, options: RetryOptions<T>): Promise<T> {
+  const { validate, label = 'The request', timeoutMs = REQUEST_TIMEOUT_MS, retries = MAX_RETRIES } = options
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= retries; attempt += 1) {
+    try {
+      const res = await fetchWithTimeout(url, timeoutMs)
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
+      return validate(await res.json())
+    } catch (err) {
+      lastErr = err
+      if (attempt < retries) await new Promise((resolve) => setTimeout(resolve, 300 * attempt))
+    }
+  }
+  if (lastErr instanceof DOMException && lastErr.name === 'AbortError') {
+    throw new Error(`${label} timed out after ${retries} attempts.`)
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(`${label} failed`)
+}
+
 //https://tnmaccess.nationalmap.gov/api/v1/docs for documentaton
 //Note is that API is limited to 10,000 results in one go, putting my own cap if I want to throttle the API a bit more
 export function buildProductsUrl(polygon: string, offset: number) {
@@ -79,19 +110,10 @@ export function buildProductsUrl(polygon: string, offset: number) {
 }
 
 export async function fetchProductsBatch(url: string): Promise<{ total: number; items: TnmItem[] }> {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
-    try {
-      const res = await fetchWithTimeout(url, REQUEST_TIMEOUT_MS)
-      if (!res.ok) throw new Error(`Request failed: ${res.status}`)
-      return await res.json()
-    } catch (err) {
-      const timedOut = err instanceof DOMException && err.name === 'AbortError'
-      if (!timedOut || attempt === MAX_RETRIES) {
-        throw timedOut ? new Error(`The National Map API timed out after ${MAX_RETRIES} attempts.`) : err
-      }
-    }
-  }
-  throw new Error('Failed to fetch data')
+  return fetchJsonWithRetry(url, {
+    label: 'The National Map API',
+    validate: (body) => body as { total: number; items: TnmItem[] },
+  })
 }
 
 
@@ -141,10 +163,74 @@ export const GIS_DATASETS: GISDatasetDef[] = [
       'https://hazards.fema.gov/arcgis/rest/services/public/NFHLWMS/MapServer/28/query' +
       `?geometry=${geometry}&geometryType=esriGeometryPolygon&inSR=4326&outFields=*&returnGeometry=true&f=geoJSON`,
   },
+  {
+    id: 'plss-state-boundaries',
+    style: { color: '#ebd725', weight: 1, fillColor: '#86b926', fillOpacity: 0.3 },
+    buildUrl: (geometry) =>
+      'https://gis.blm.gov/arcgis/rest/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/0/query' +
+      `?geometry=${geometry}&geometryType=esriGeometryPolygon&inSR=4326&outFields=*&returnGeometry=true&f=geoJSON`,
+  },
+   {
+    id: 'plss-town-boundaries',
+    style: { color: '#a79819', weight: 1, fillColor: '#5c8116', fillOpacity: 0.3 },
+    buildUrl: (geometry) =>
+      'https://gis.blm.gov/arcgis/rest/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/1/query' +
+      `?geometry=${geometry}&geometryType=esriGeometryPolygon&inSR=4326&outFields=*&returnGeometry=true&f=geoJSON`,
+  },
+   {
+    id: 'plss-section-boundaries',
+    style: { color: '#267217', weight: 1, fillColor: '#125a30', fillOpacity: 0.3 },
+    buildUrl: (geometry) =>
+      'https://gis.blm.gov/arcgis/rest/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/2/query' +
+      `?geometry=${geometry}&geometryType=esriGeometryPolygon&inSR=4326&outFields=*&returnGeometry=true&f=geoJSON`,
+  },
+   {
+    id: 'plss-intersected-boundaries',
+    style: { color: '#cc8221', weight: 1, fillColor: '#88631d', fillOpacity: 0.3 },
+    buildUrl: (geometry) =>
+      'https://gis.blm.gov/arcgis/rest/services/Cadastral/BLM_Natl_PLSS_CadNSDI/MapServer/3/query' +
+      `?geometry=${geometry}&geometryType=esriGeometryPolygon&inSR=4326&outFields=*&returnGeometry=true&f=geoJSON`,
+  },
+  {
+    id: 'state-boundaries',
+    style: { color: '#c40f0f', weight: 1, fillColor: '#4f3609', fillOpacity: 0.3 },
+    buildUrl: (geometry) =>
+      'https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/2/query' +
+      `?geometry=${geometry}&geometryType=esriGeometryPolygon&inSR=4326&outFields=*&returnGeometry=true&f=geoJSON`,
+  },
+  {
+    id: 'county-boundaries',
+    style: { color: '#462c0b', weight: 1, fillColor: '#281d09', fillOpacity: 0.3 },
+    buildUrl: (geometry) =>
+      'https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/23/query' +
+      `?geometry=${geometry}&geometryType=esriGeometryPolygon&inSR=4326&outFields=*&returnGeometry=true&f=geoJSON`,
+  },
 ]
 
+// ArcGIS returns HTTP 200 with an `{ error }` body on transient failures, and a
+// real FeatureCollection on success. Throwing here (instead of casting) turns
+// those error bodies into retryable failures. A genuinely empty area still
+// returns a valid FeatureCollection with `features: []`, which passes and is
+// therefore NOT retried.
+function toFeatureCollection(body: unknown): FeatureCollection {
+  if (body && typeof body === 'object' && 'error' in body) {
+    const err = (body as { error?: { message?: string } }).error
+    throw new Error(`server error${err?.message ? `: ${err.message}` : ''}`)
+  }
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    (body as { type?: unknown }).type !== 'FeatureCollection' ||
+    !Array.isArray((body as { features?: unknown }).features)
+  ) {
+    throw new Error('unexpected response (expected a GeoJSON FeatureCollection)')
+  }
+  return body as FeatureCollection
+}
+
 // Fetches every registered dataset for the AOI. One dataset failing doesn't
-// block the others; failures are reported via the returned `errors`.
+// block the others; failures are reported via the returned `errors`. Each fetch
+// retries transient failures (timeouts, 5xx, and ArcGIS 200-with-error bodies).
 export async function fetchGISDatasets(
   points: LatLngTuple[],
 ): Promise<{ datasets: GISDataset[]; errors: string[] }> {
@@ -152,10 +238,10 @@ export async function fetchGISDatasets(
 
   const results = await Promise.allSettled(
     GIS_DATASETS.map(async (def): Promise<GISDataset> => {
-      const res = await fetchWithTimeout(def.buildUrl(geometry), REQUEST_TIMEOUT_MS)
-      if (!res.ok) throw new Error(`${def.id} request failed: ${res.status}`)
-      const data = (await res.json()) as FeatureCollection
-      return { id: def.id, style: def.style, data }
+      const data = await fetchJsonWithRetry(def.buildUrl(geometry), {
+        validate: toFeatureCollection,
+      })
+      return { id: def.id, style: def.style, visibile: false, data }
     }),
   )
 

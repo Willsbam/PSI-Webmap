@@ -37,5 +37,6 @@ export interface GISDatasetDef {
 export interface GISDataset {
   id: string
   style: GISStyle
+  visibile: boolean
   data: FeatureCollection
 }

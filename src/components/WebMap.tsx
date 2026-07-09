@@ -44,9 +44,10 @@ interface WebMapProps {
   onSelectItem: (id: string) => void
   gisDatasets: GISDataset[]
   gisKey: number
+  showLidar: boolean
 }
 
-function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,}: WebMapProps) {
+function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,showLidar,}: WebMapProps) {
   return (
     <div id="map-shell">
       <MapContainer
@@ -63,11 +64,13 @@ function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gis
         />
         <SearchBar />
         <PolygonDrawer points={points} onAddPoint={onAddPoint} dataLoaded={items.length > 0} />
-        <ResultsLayer items={items} selectedItemId={selectedItemId} onSelectItem={onSelectItem} />
+        {showLidar && <ResultsLayer items={items} selectedItemId={selectedItemId} onSelectItem={onSelectItem} />}
 
-        {gisDatasets.map((dataset) => (
-          <GeoJSON key={`${dataset.id}:${gisKey}`} data={dataset.data} style={dataset.style} />
-        ))}
+        {gisDatasets.map((dataset) =>
+          dataset.visibile ? (
+            <GeoJSON key={`${dataset.id}:${gisKey}`} data={dataset.data} style={dataset.style} />
+          ) : null,
+        )}
 
 
         <LinkDownloader />
