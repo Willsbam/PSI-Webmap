@@ -40,6 +40,19 @@ function App() {
     setGisDatasets((prev) => prev.map((d) => (d.id === id ? { ...d, visibile: !d.visibile } : d)))
   }, [])
 
+  // Replaces the drawn polygon with one loaded from a .kmz, clearing prior results.
+  const handleLoadPolygon = useCallback((polygon: LatLngTuple[]) => {
+    loadState.current = 0
+    setItems([])
+    setTotal(null)
+    setError(null)
+    setGisDatasets([])
+    setGisError(null)
+    setGisLoading(false)
+    setSelectedItemId(null)
+    setPoints(polygon)
+  }, [])
+
   const handleReset = () => {
     loadState.current = 0
     setPoints([])
@@ -126,6 +139,7 @@ function App() {
         gisDatasets={gisDatasets}
         gisKey={gisKey}
         showLidar={activeTab === 'lidar'}
+        onLoadPolygon={handleLoadPolygon}
       />
       {panelOpen && (
         <SidePanel

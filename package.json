@@ -11,12 +11,13 @@
   },
   "dependencies": {
     "@mapbox/shp-write": "^0.4.3",
+    "@tmcw/togeojson": "^7.1.2",
     "@turf/turf": "^7.3.5",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "react": "^19.0.0-rc.1",
     "react-dom": "^19.0.0-rc.1",
-    "react-leaflet": "^5.0.0-rc.2",
-    "shp-write": "^0.3.2"
+    "react-leaflet": "^5.0.0-rc.2"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.21",

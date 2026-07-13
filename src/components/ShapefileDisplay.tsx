@@ -34,7 +34,7 @@ function ShapefileDisplay({ gisDatasets, loading, error, onToggleDataset }: Shap
       try {
         const files: { id: string; url: string }[] = []
         for (const dataset of gisDatasets) {
-          const blob = await shpwrite.zip(dataset.data, { outputType: 'blob', compression: 'DEFLATE' })
+          const blob = await shpwrite.zip<'blob'>(dataset.data, { outputType: 'blob', compression: 'DEFLATE' })
           const url = URL.createObjectURL(blob)
           createdUrls.push(url)
           files.push({ id: dataset.id, url })

@@ -5,6 +5,7 @@ import type { GISDataset, TnmItem } from '../types'
 import SearchBar from './SearchBar'
 import ResultsLayer from './ResultsLayer'
 import LinkDownloader from './linkDownloader'
+import KmzUploader from './KmzUploader'
 import './WebMap.css'
 
 
@@ -45,9 +46,10 @@ interface WebMapProps {
   gisDatasets: GISDataset[]
   gisKey: number
   showLidar: boolean
+  onLoadPolygon: (points: LatLngTuple[]) => void
 }
 
-function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,showLidar,}: WebMapProps) {
+function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,showLidar,onLoadPolygon,}: WebMapProps) {
   return (
     <div id="map-shell">
       <MapContainer
@@ -63,6 +65,7 @@ function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gis
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
         <SearchBar />
+        <KmzUploader onLoadPolygon={onLoadPolygon} />
         <PolygonDrawer points={points} onAddPoint={onAddPoint} dataLoaded={items.length > 0} />
         {showLidar && <ResultsLayer items={items} selectedItemId={selectedItemId} onSelectItem={onSelectItem} />}
 
