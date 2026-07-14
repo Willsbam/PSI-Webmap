@@ -13,6 +13,7 @@ interface SidePanelProps {
   gisDatasets: GISDataset[]
   gisError: string | null
   gisLoading: boolean
+  gisPending: string[]
   onToggleDataset: (id: string) => void
   activeTab: 'lidar' | 'shapefiles'
   onSelectTab: (tab: 'lidar' | 'shapefiles') => void
@@ -21,7 +22,7 @@ interface SidePanelProps {
   onClose: () => void
 }
 
-function SidePanel({ items, total, loading, error, gisDatasets, gisError, gisLoading, onToggleDataset, activeTab, onSelectTab, selectedItemId, onSelectItem, onClose }: SidePanelProps) {
+function SidePanel({ items, total, loading, error, gisDatasets, gisError, gisLoading, gisPending, onToggleDataset, activeTab, onSelectTab, selectedItemId, onSelectItem, onClose }: SidePanelProps) {
   const itemRefs = useRef(new Map<string, HTMLLIElement>())
 
   useEffect(() => {
@@ -61,7 +62,7 @@ function SidePanel({ items, total, loading, error, gisDatasets, gisError, gisLoa
 
       {activeTab === 'shapefiles' && (
         <div>
-          <ShapefileDisplay gisDatasets={gisDatasets} loading={gisLoading} error={gisError} onToggleDataset={onToggleDataset} />
+          <ShapefileDisplay gisDatasets={gisDatasets} loading={gisLoading} pending={gisPending} error={gisError} onToggleDataset={onToggleDataset} />
         </div>
       )}
     </aside>

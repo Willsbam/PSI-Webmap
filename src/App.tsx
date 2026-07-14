@@ -19,6 +19,9 @@ function App() {
   // The GIS fetch runs after the TNM loop, so it needs its own loading flag —
   // loadState (TNM/Lidar) reaching 2 doesn't mean the GIS datasets are in yet.
   const [gisLoading, setGisLoading] = useState(false)
+  // Dataset ids whose fetch is still in flight; each is removed as its result
+  // (or failure) streams in, so the panel can show per-dataset loading rows.
+  const [gisPending, setGisPending] = useState<string[]>([])
   // react-leaflet's <GeoJSON> doesn't diff `data` after mount, so bump this on
   // each fetch to force a remount with the new coverage.
   const [gisKey, setGisKey] = useState(0)
@@ -49,6 +52,7 @@ function App() {
     setGisDatasets([])
     setGisError(null)
     setGisLoading(false)
+    setGisPending([])
     setSelectedItemId(null)
     setPoints(polygon)
   }, [])
@@ -64,6 +68,7 @@ function App() {
     setGisDatasets([])
     setGisError(null)
     setGisLoading(false)
+    setGisPending([])
   }
 
   const processSelection = useCallback(async () => 
@@ -107,12 +112,26 @@ function App() {
 
     } 
 
-    //Every dataset registered in nwf.GIS_DATASETS is fetched for the AOI and
-    //drawn as a GeoJSON overlay by WebMap
-    const { datasets, errors } = await nwf.fetchGISDatasets(points)
-    setGisDatasets(datasets)
+    //Every dataset registered in nwf.GIS_DATASETS (plus the backend catalog) is
+    //fetched for the AOI; each one is appended and drawn the moment it lands
+    //rather than waiting for the slowest request.
+    setGisDatasets([])
+    // Bump BEFORE arrivals so each streamed dataset mounts a fresh <GeoJSON>
+    // (its key is `${id}:${gisKey}`) instead of reusing a stale one.
     setGisKey((k) => k + 1)
-    if (errors.length) setGisError(errors.join('; '))
+    await nwf.fetchGISDatasets(points, {
+      onStart: (ids) => setGisPending(ids),
+      onDataset: (dataset) => {
+        setGisDatasets((prev) => [...prev, dataset])
+        setGisPending((prev) => prev.filter((id) => id !== dataset.id))
+      },
+      onError: (id, message) => {
+        const label = id ? `${id}: ${message}` : message
+        setGisError((prev) => (prev ? `${prev}; ${label}` : label))
+        if (id) setGisPending((prev) => prev.filter((p) => p !== id))
+      },
+    })
+    setGisPending([])
     setGisLoading(false)
   }, [points])
 
@@ -150,6 +169,7 @@ function App() {
           gisDatasets={gisDatasets}
           gisError={gisError}
           gisLoading={gisLoading}
+          gisPending={gisPending}
           onToggleDataset={handleToggleDataset}
           activeTab={activeTab}
           onSelectTab={setActiveTab}

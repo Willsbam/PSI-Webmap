@@ -24,13 +24,21 @@ export interface GISStyle {
   fillOpacity: number
 }
 
-// Definition of an AOI-driven GeoJSON overlay: given the user's polygon as an
-// encoded Esri `rings` geometry, produce the query URL. Registered definitions
-// (see GIS_DATASETS in lib/nwf.ts) are fetched and drawn automatically.
+// The user's AOI in the forms dataset queries need: an encoded Esri `rings`
+// geometry for ArcGIS endpoints, and a lon/lat bounding box for bbox endpoints
+// (e.g. the parcel backend).
+export interface AoiQuery {
+  geometry: string
+  bbox: { minLon: number; minLat: number; maxLon: number; maxLat: number }
+}
+
+// Definition of an AOI-driven GeoJSON overlay: given the user's AOI, produce
+// the query URL. Registered definitions (see GIS_DATASETS in lib/nwf.ts) are
+// fetched and drawn automatically.
 export interface GISDatasetDef {
   id: string
   style: GISStyle
-  buildUrl: (geometry: string) => string
+  buildUrl: (aoi: AoiQuery) => string
 }
 
 // A fetched dataset, paired with its style, ready for the map.

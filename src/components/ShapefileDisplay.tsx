@@ -6,13 +6,14 @@ import './SidePanel.css'
 interface ShapefileDisplayProps {
   gisDatasets: GISDataset[]
   loading: boolean
+  pending: string[]
   error: string | null
   onToggleDataset: (id: string) => void
 }
 
 // Renders a downloadable shapefile (.zip) per GIS dataset. Zipping is generic:
 // any GISDataset registered in nwf.GIS_DATASETS flows through here unchanged.
-function ShapefileDisplay({ gisDatasets, loading, error, onToggleDataset }: ShapefileDisplayProps) {
+function ShapefileDisplay({ gisDatasets, loading, pending, error, onToggleDataset }: ShapefileDisplayProps) {
   const [shapefiles, setShapefiles] = useState<{ id: string; url: string }[]>([])
 
   const [zipError, setZipError] = useState<string | null>(null)
@@ -57,7 +58,12 @@ function ShapefileDisplay({ gisDatasets, loading, error, onToggleDataset }: Shap
 
   return (
     <div>
-      {loading && <p className="status">Searching for GIS datasets…</p>}
+      {loading && pending.length === 0 && <p className="status">Searching for GIS datasets…</p>}
+      {pending.map((id) => (
+        <p key={id} className="status">
+          Loading {id}…
+        </p>
+      ))}
       {error && <p className="status error">{error}</p>}
       {zipError && <p className="status error">{zipError}</p>}
       {zipping && <p className="status">Preparing shapefiles…</p>}
