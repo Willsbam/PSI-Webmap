@@ -271,6 +271,38 @@ function toFeatureCollection(body: unknown): FeatureCollection {
   return body as FeatureCollection
 }
 
+// Reduces an ArcGIS layer query URL down to its service root, e.g.
+// …/MapServer/2/query?… -> …/MapServer. Non-MapServer URLs return null.
+function mapServerRoot(queryUrl: string): string | null {
+  const match = queryUrl.match(/^(.*\/MapServer)\/\d+\/query/i)
+  return match ? match[1] : null
+}
+
+// One metadata lookup per MapServer, shared by every layer on that service
+// (the four PLSS layers hit the same root, so this fetches it once).
+const wkidCache = new Map<string, Promise<number | undefined>>()
+
+// The service root's `spatialReference.wkid` is the data's native projection.
+// Metadata is nice-to-have: any failure resolves to undefined rather than
+// failing the dataset itself.
+function lookupMapServerWkid(queryUrl: string): Promise<number | undefined> {
+  const root = mapServerRoot(queryUrl)
+  if (!root) return Promise.resolve(undefined)
+
+  let cached = wkidCache.get(root)
+  if (!cached) {
+    cached = fetchJsonWithRetry(`${root}?f=json`, {
+      label: 'MapServer metadata',
+      validate: (body) => {
+        const wkid = (body as { spatialReference?: { wkid?: unknown } })?.spatialReference?.wkid
+        return typeof wkid === 'number' ? wkid : undefined
+      },
+    }).catch(() => undefined)
+    wkidCache.set(root, cached)
+  }
+  return cached
+}
+
 export interface GISDatasetHandlers {
   // Fired once discovery is done, with every dataset id about to be fetched.
   onStart: (ids: string[]) => void
@@ -311,11 +343,13 @@ export async function fetchGISDatasets(points: LatLngTuple[], handlers: GISDatas
 
   await Promise.allSettled(
     defs.map(async (def) => {
+      const url = def.buildUrl(aoi)
       try {
-        const data = await fetchJsonWithRetry(def.buildUrl(aoi), {
-          validate: toFeatureCollection,
-        })
-        handlers.onDataset({ id: def.id, style: def.style, visibile: false, data })
+        const [data, wkid] = await Promise.all([
+          fetchJsonWithRetry(url, { validate: toFeatureCollection }),
+          lookupMapServerWkid(url),
+        ])
+        handlers.onDataset({ id: def.id, style: def.style, visibile: false, wkid, data })
       } catch (err) {
         handlers.onError(def.id, err instanceof Error ? err.message : 'request failed')
       }

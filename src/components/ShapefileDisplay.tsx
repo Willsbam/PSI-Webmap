@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import * as shpwrite from '@mapbox/shp-write'
+import { useState } from 'react'
 import type { GISDataset } from '../types'
+import { bundleShapefiles } from '../lib/shapefile'
 import './SidePanel.css'
 
 interface ShapefileDisplayProps {
@@ -11,50 +11,34 @@ interface ShapefileDisplayProps {
   onToggleDataset: (id: string) => void
 }
 
-// Renders a downloadable shapefile (.zip) per GIS dataset. Zipping is generic:
-// any GISDataset registered in nwf.GIS_DATASETS flows through here unchanged.
+// Lists every loaded GIS dataset with a map show/hide toggle. Visible datasets
+// double as the download selection: "Download visible" bundles them into one
+// shapefile .zip (one folder per dataset) so the browser sees a single download.
 function ShapefileDisplay({ gisDatasets, loading, pending, error, onToggleDataset }: ShapefileDisplayProps) {
-  const [shapefiles, setShapefiles] = useState<{ id: string; url: string }[]>([])
+  const [bundling, setBundling] = useState(false)
+  const [bundleError, setBundleError] = useState<string | null>(null)
 
-  const [zipError, setZipError] = useState<string | null>(null)
-  const [zipping, setZipping] = useState(false)
+  const visibleDatasets = gisDatasets.filter((d) => d.visibile)
 
-  //Zips each dataset into a shapefile blob and exposes it as an object URL.
-  useEffect(() => {
-    if (gisDatasets.length === 0) {
-      setShapefiles([])
-      return
+  const handleDownloadVisible = async () => {
+    if (visibleDatasets.length === 0 || bundling) return
+    setBundling(true)
+    setBundleError(null)
+    try {
+      const blob = await bundleShapefiles(visibleDatasets)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'shapefiles.zip'
+      link.click()
+      // Keep the URL alive briefly so the download can start before revoking.
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      setBundleError(err instanceof Error ? err.message : 'Failed to build download')
+    } finally {
+      setBundling(false)
     }
-
-    let cancelled = false
-    const createdUrls: string[] = []
-    setZipping(true)
-    setZipError(null)
-
-    ;(async () => {
-      try {
-        const files: { id: string; url: string }[] = []
-        for (const dataset of gisDatasets) {
-          const blob = await shpwrite.zip<'blob'>(dataset.data, { outputType: 'blob', compression: 'DEFLATE' })
-          const url = URL.createObjectURL(blob)
-          createdUrls.push(url)
-          files.push({ id: dataset.id, url })
-        }
-        if (!cancelled) setShapefiles(files)
-      } catch (err) {
-        if (!cancelled) setZipError(err instanceof Error ? err.message : 'Failed to generate shapefile')
-      } finally {
-        if (!cancelled) setZipping(false)
-      }
-    })()
-
-    // Revoke on the next run (dataset change) and on unmount, so object URLs
-    // don't leak once their <a href> is no longer reachable.
-    return () => {
-      cancelled = true
-      createdUrls.forEach((url) => URL.revokeObjectURL(url))
-    }
-  }, [gisDatasets])
+  }
 
   return (
     <div>
@@ -64,29 +48,42 @@ function ShapefileDisplay({ gisDatasets, loading, pending, error, onToggleDatase
           Loading {id}…
         </p>
       ))}
+      {gisDatasets.length > 0 && (
+        <div className="shp-download-bar">
+          <button
+            type="button"
+            className="shp-download-all"
+            disabled={visibleDatasets.length === 0 || bundling}
+            onClick={handleDownloadVisible}
+          >
+            {bundling ? 'Preparing…' : `Download visible (${visibleDatasets.length})`}
+          </button>
+        </div>
+      )}
       {error && <p className="status error">{error}</p>}
-      {zipError && <p className="status error">{zipError}</p>}
-      {zipping && <p className="status">Preparing shapefiles…</p>}
+      {bundleError && <p className="status error">{bundleError}</p>}
       {!loading && !error && gisDatasets.length === 0 && (
         <p className="status">No shapefile datasets found for this area.</p>
       )}
-      <ul className="item-list">
-        {shapefiles.map((file) => {
-          const visible = gisDatasets.find((d) => d.id === file.id)?.visibile ?? true
-          return (
-            <li key={file.id}>
-              <button type="button" className="shpToggle" style={{backgroundColor: visible ? 'rgb(58, 58, 141)': ' #aa3bff'}}
-               onClick={() => onToggleDataset(file.id)}>
-                {visible ? 'Hide on map' : 'Show on map'}
-              </button>
 
-              <p className="item-title">{file.id}</p>
-              <a href={file.url} download={`${file.id}.zip`}>
-                Download shapefile (.zip)
-              </a>
-            </li>
-          )
-        })}
+      
+
+      <ul className="item-list">
+        {gisDatasets.map((dataset) => (
+          <li key={dataset.id}>
+            <button
+              type="button"
+              className="shpToggle"
+              style={{ backgroundColor: dataset.visibile ? 'rgb(58, 58, 141)' : ' #aa3bff' }}
+              onClick={() => onToggleDataset(dataset.id)}
+            >
+              {dataset.visibile ? 'Hide on map' : 'Show on map'}
+            </button>
+
+            <p className="item-title">{dataset.id}</p>
+            {dataset.wkid !== undefined && <p className="item-meta">Source projection: WKID {dataset.wkid}</p>}
+          </li>
+        ))}
       </ul>
     </div>
   )

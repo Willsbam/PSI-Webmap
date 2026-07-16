@@ -121,6 +121,31 @@
     border-radius: 5px;
     border: none;
 }
+
+.shp-download-bar {
+  padding: 12px 20px;
+  border-bottom: 1px solid #e5e4e7;
+}
+
+.shp-download-all {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  background: #aa3bff;
+  color: #fff;
+  cursor: pointer;
+}
+
+.shp-download-all:hover:not(:disabled) {
+  background: #9326e6;
+}
+
+.shp-download-all:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .shpToggle
 {
      background-color: #aa3bff;

@@ -41,10 +41,13 @@ export interface GISDatasetDef {
   buildUrl: (aoi: AoiQuery) => string
 }
 
-// A fetched dataset, paired with its style, ready for the map.
+// A fetched dataset, paired with its style, ready for the map. `wkid` is the
+// serving MapServer's native spatial reference (undefined for non-ArcGIS
+// sources or when the metadata lookup fails).
 export interface GISDataset {
   id: string
   style: GISStyle
   visibile: boolean
+  wkid?: number
   data: FeatureCollection
 }
