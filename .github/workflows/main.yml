@@ -6,6 +6,7 @@ jobs:
   redopl:
     name: "Hot deploy content"
     runs-on: ubuntu-latest
+    environment: Deployment
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
