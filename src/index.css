@@ -11,5 +11,17 @@ html,
 body,
 #root {
   height: 100%;
+  /* Chrome on Android sizes the layout viewport to the URL-bar-hidden height,
+     so plain 100% makes the shell taller than the screen, the document
+     scrollable, and the header the first thing scrolled out of view. dvh
+     tracks the *visible* viewport as that browser UI collapses/expands. */
+  height: 100dvh;
   margin: 0;
+}
+
+/* The shell is a fixed header + map; only the side panel scrolls, internally.
+   Nothing should ever scroll the document itself. */
+html,
+body {
+  overflow: hidden;
 }

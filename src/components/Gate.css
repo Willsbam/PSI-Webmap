@@ -8,6 +8,9 @@
   padding: 16px;
   box-sizing: border-box;
   background: var(--primary-blue);
+  /* The document no longer scrolls, so the gate scrolls itself if the card is
+     taller than the screen (e.g. a phone in landscape). */
+  overflow-y: auto;
 }
 
 .gate-card {
