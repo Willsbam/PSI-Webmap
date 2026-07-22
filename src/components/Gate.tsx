@@ -14,7 +14,8 @@ const MOBILE_ACK_KEY = 'psi-webmap-mobile-ack'
 // Phones and tablets: a narrow viewport or a touch-primary pointer. Checked once
 // on mount — this only decides whether to show the warning, not layout.
 function isMobileDevice(): boolean {
-  return window.matchMedia('(max-width: 820px), (pointer: coarse)').matches
+  console.log( window.matchMedia('(max-width: 820px)').matches)
+  return window.matchMedia('(max-width: 820px)').matches
 }
 
 interface GateProps {
