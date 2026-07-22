@@ -1,0 +1,16 @@
+name: Redeployment on push to main
+on:
+  push:
+    branches: ['main']
+jobs:
+  redopl:
+    name: "Hot deploy content"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: ls
