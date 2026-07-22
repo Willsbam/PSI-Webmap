@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { TnmItem } from '../types'
+import type { TnmItem } from '../lib/types'
 import './SidePanel.css'
 import { formatBytes } from '../lib/utils'
 
@@ -27,7 +27,16 @@ function LidarData({ items, total, loading, error, selectedItemId, onSelectItem 
           {total === null ? 'Searching The National Map…' : `Loading ${items.length} of ${total}…`}
         </p>
       )}
-      {error && <p className="status error">{error}</p>}
+      {error && (<>
+ <p className="status error">{error}</p>
+        <p className="status error">Please try:</p>
+        <ul className="status error">
+          <li>Retrying the request</li>
+          <li>Drawing a smaller polygon</li>
+        </ul>
+      </>
+       
+      )}
       {loading===2 && !error && items.length === 0 && (
         <p className="status">No datasets found for this area.</p>
       )}

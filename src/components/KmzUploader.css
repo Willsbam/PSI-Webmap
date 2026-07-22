@@ -1,6 +1,6 @@
 .kmz-uploader {
   position: absolute;
-  top: 80px;
+  top: 8px;
   left: 10px;
   z-index: 1000;
   display: flex;
@@ -11,12 +11,11 @@
 
 .kmz-button {
   display: inline-block;
-  font-size: 13px;
-  padding: 8px 12px;
+  font-size: 14px;
+  padding: 6px 14px;
   border-radius: 6px;
   border: 1px solid rgba(0, 0, 0, 0.15);
-  background: #fff;
-  color: #08060d;
+  background-color: var( --secondary-blue);
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   text-align: center;

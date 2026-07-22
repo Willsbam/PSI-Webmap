@@ -1,6 +1,6 @@
 import JSZip from 'jszip'
 import * as shpwrite from '@mapbox/shp-write'
-import type { GISDataset } from '../types'
+import type { GISDataset } from './types'
 
 // shp-write names files by geometry type (POLYGON.shp, POINT.shp, …), so two
 // datasets of the same type would collide at the zip root. Giving each dataset

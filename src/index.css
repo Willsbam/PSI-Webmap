@@ -1,8 +1,12 @@
 :root {
   color-scheme: light dark;
-  font: 16px/145% system-ui, 'Segoe UI', Roboto, sans-serif;
+  --primary-blue: #004ca3;
+  --secondary-blue: rgb(7, 111, 229);
+  font-family: "Avenir Next", sans-serif, "PingFang SC", "Microsoft YaHei";
 }
-
+button{
+  background-color: var( --secondary-blue);
+}
 html,
 body,
 #root {

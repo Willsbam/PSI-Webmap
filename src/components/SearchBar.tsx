@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { useMap } from 'react-leaflet'
-import L from 'leaflet'
+import { useState } from 'react'
+import type { LatLngBoundsExpression } from 'leaflet'
 import './SearchBar.css'
 
 interface NominatimResult {
@@ -10,20 +9,15 @@ interface NominatimResult {
   boundingbox: [string, string, string, string]
 }
 
-function SearchBar() {
-  const map = useMap()
-  const formRef = useRef<HTMLFormElement>(null)
+interface SearchBarProps {
+  onSelectLocation: (bounds: LatLngBoundsExpression) => void
+}
+
+function SearchBar({ onSelectLocation }: SearchBarProps) {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<NominatimResult[]>([])
-
-  useEffect(() => {
-    const el = formRef.current
-    if (!el) return
-    L.DomEvent.disableClickPropagation(el)
-    L.DomEvent.disableScrollPropagation(el)
-  }, [])
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,7 +49,7 @@ function SearchBar() {
 
   const handleSelect = (result: NominatimResult) => {
     const [south, north, west, east] = result.boundingbox.map(Number)
-    map.flyToBounds([
+    onSelectLocation([
       [south, west],
       [north, east],
     ])
@@ -64,7 +58,7 @@ function SearchBar() {
   }
 
   return (
-    <form ref={formRef} className="search-bar" onSubmit={handleSearch}>
+    <form className="search-bar" onSubmit={handleSearch}>
       <div className="search-bar-row">
         <input
           type="text"

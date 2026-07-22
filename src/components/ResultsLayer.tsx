@@ -4,7 +4,7 @@ import * as L from 'leaflet'
 import type { LatLngBounds, LatLngTuple, LeafletMouseEvent, Rectangle as LeafletRectangle } from 'leaflet'
 import { bboxPolygon, dissolve, featureCollection } from '@turf/turf'
 import type { FeatureCollection, Polygon } from 'geojson'
-import type { TnmBoundingBox, TnmItem } from '../types'
+import type { TnmBoundingBox, TnmItem } from '../lib/types'
 
 // Above this many visible items, individual rectangles give way to a merged coverage shape.
 const MERGE_THRESHOLD = 1000

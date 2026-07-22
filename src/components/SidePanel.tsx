@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { GISDataset, TnmItem } from '../types'
+import type { GISDataset, TnmItem } from '../lib/types'
 import './SidePanel.css'
 import LidarData from './LidarDataDisplay'
 import ShapefileDisplay from './ShapefileDisplay'

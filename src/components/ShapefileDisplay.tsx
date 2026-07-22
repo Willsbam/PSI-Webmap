@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { GISDataset } from '../types'
+import type { GISDataset } from '../lib/types'
 import { bundleShapefiles } from '../lib/shapefile'
 import './SidePanel.css'
 

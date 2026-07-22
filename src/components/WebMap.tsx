@@ -1,8 +1,8 @@
 import { GeoJSON, MapContainer, Polygon, TileLayer, useMapEvents } from 'react-leaflet'
-import type { LatLngBoundsExpression, LatLngTuple } from 'leaflet'
+import type { LatLngBoundsExpression, LatLngTuple, Map as LeafletMap } from 'leaflet'
+import type { RefObject } from 'react'
 import 'leaflet/dist/leaflet.css'
-import type { GISDataset, TnmItem } from '../types'
-import SearchBar from './SearchBar'
+import type { GISDataset, TnmItem } from '../lib/types'
 import ResultsLayer from './ResultsLayer'
 import LinkDownloader from './linkDownloader'
 import KmzUploader from './KmzUploader'
@@ -19,9 +19,10 @@ interface PolygonDrawerProps {
   points: LatLngTuple[]
   onAddPoint: (point: LatLngTuple) => void
   dataLoaded: boolean
+  invalid: boolean
 }
 
-function PolygonDrawer({ points, onAddPoint, dataLoaded }: PolygonDrawerProps) {
+function PolygonDrawer({ points, onAddPoint, dataLoaded, invalid }: PolygonDrawerProps) {
   useMapEvents({
     click(e) {
       //Basically you shouldn't be able to add points if data is already loaded,
@@ -33,7 +34,12 @@ function PolygonDrawer({ points, onAddPoint, dataLoaded }: PolygonDrawerProps) {
 
   if (points.length < 2) return null
 
-  return <Polygon positions={points} pathOptions={{ color: '#aa3bff', weight: 2, fillOpacity: 0.15 }} />
+  return (
+    <Polygon
+      positions={points}
+      pathOptions={{ color: invalid ? '#c0392b' : '#aa3bff', weight: 2, fillOpacity: 0.15 }}
+    />
+  )
 }
 
 interface WebMapProps {
@@ -47,15 +53,21 @@ interface WebMapProps {
   gisKey: number
   showLidar: boolean
   onLoadPolygon: (points: LatLngTuple[]) => void
+  // Handed up to App so the header's search bar can fly the map from outside
+  // the MapContainer, where useMap() isn't available.
+  mapRef: RefObject<LeafletMap | null>
+  invalidPolygon: boolean
 }
 
-function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,showLidar,onLoadPolygon,}: WebMapProps) {
+function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,showLidar,onLoadPolygon,mapRef,invalidPolygon,}: WebMapProps) {
   return (
     <div id="map-shell">
       <MapContainer
+        ref={mapRef}
         center={[39.8283, -98.5795]}
         zoom={4}
         minZoom={3}
+        zoomControl={false}
         maxBounds={US_BOUNDS}
         maxBoundsViscosity={1.0}
         className="map"
@@ -64,9 +76,8 @@ function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gis
           url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         />
-        <SearchBar />
         <KmzUploader onLoadPolygon={onLoadPolygon} />
-        <PolygonDrawer points={points} onAddPoint={onAddPoint} dataLoaded={items.length > 0} />
+        <PolygonDrawer points={points} onAddPoint={onAddPoint} dataLoaded={items.length > 0} invalid={invalidPolygon} />
         {showLidar && <ResultsLayer items={items} selectedItemId={selectedItemId} onSelectItem={onSelectItem} />}
 
         {gisDatasets.map((dataset) =>
@@ -84,7 +95,11 @@ function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gis
           <button type="button" className="reset" onClick={onReset}>
             Clear polygon ({points.length} point{points.length === 1 ? '' : 's'})
           </button>
-          {points.length >= 3 && <div className="hint">Press Enter to search this area</div>}
+          {invalidPolygon ? (
+            <div className="hint error">Invalid geometry — please clear and redraw without crossing lines</div>
+          ) : (
+            points.length >= 3 && <div className="hint">Press Enter to search this area</div>
+          )}
         </div>
       )}
     </div>

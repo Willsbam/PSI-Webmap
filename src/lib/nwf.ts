@@ -2,7 +2,8 @@
 
 import type { LatLngTuple } from 'leaflet'
 import type { FeatureCollection } from 'geojson'
-import type { AoiQuery, GISDataset, GISDatasetDef, TnmItem } from '../types'
+import { kinks, polygon as turfPolygon } from '@turf/turf'
+import type { AoiQuery, GISDataset, GISDatasetDef, TnmItem } from './types'
 
 // Local GIS backend (PostGIS behind a .NET API). In a deployed app this
 // should come from an env var (import.meta.env) instead of a hardcoded host.
@@ -16,7 +17,14 @@ interface FirmFeature {
 
 export const MAX_RETRIES = 5
 export const REQUEST_TIMEOUT_MS = 10000
-export const MAX_RETURN = 1000
+// TNM's backend takes ~20-29s per request and its gateway 504s at ~29.5s, so
+// pages must be small enough to fit under that ceiling (1000 reliably 504s on
+// lidar-dense AOIs; ~150 completes), the client timeout must outlast the
+// gateway (10s would abort before TNM ever answers), and retries are kept low
+// because each doomed attempt costs up to ~30s.
+export const MAX_RETURN = 150
+export const TNM_TIMEOUT_MS = 35000
+export const TNM_RETRIES = 3
 
 
 async function getFirmPanel(lat: number, lon: number): Promise<string> {
@@ -116,11 +124,23 @@ export function buildProductsUrl(polygon: string, offset: number) {
 export async function fetchProductsBatch(url: string): Promise<{ total: number; items: TnmItem[] }> {
   return fetchJsonWithRetry(url, {
     label: 'The National Map API',
+    timeoutMs: TNM_TIMEOUT_MS,
+    retries: TNM_RETRIES,
     validate: (body) => body as { total: number; items: TnmItem[] },
   })
 }
 
 
+
+// True when the drawn AOI's edges cross each other (a "bowtie"). Esri rejects
+// self-intersecting rings, so the UI warns and blocks the search instead of
+// sending a query that can't work. Fewer than 4 vertices can't self-cross.
+export function isSelfIntersecting(points: LatLngTuple[]): boolean {
+  if (points.length < 4) return false
+  const ring = points.map(([lat, lng]) => [lng, lat])
+  ring.push(ring[0])
+  return kinks(turfPolygon([ring])).features.length > 0
+}
 
 // Esri's `rings` format is orientation-sensitive: a clockwise ring is an
 // exterior boundary, a counter-clockwise one is a hole. The user can trace the
@@ -304,7 +324,9 @@ function lookupMapServerWkid(queryUrl: string): Promise<number | undefined> {
 }
 
 export interface GISDatasetHandlers {
-  // Fired once discovery is done, with every dataset id about to be fetched.
+  // Fired per batch of ids about to be fetched: once for the static registry,
+  // and again for the backend's layers once discovery lands. Ids should be
+  // APPENDED to whatever is already pending, not replace it.
   onStart: (ids: string[]) => void
   // Fired per dataset the moment its fetch lands, in completion order.
   onDataset: (dataset: GISDataset) => void
@@ -312,11 +334,33 @@ export interface GISDatasetHandlers {
   onError: (id: string | null, message: string) => void
 }
 
+// Fetches one dataset and streams the result — or the failure — through the
+// handlers. Never rejects; a failed dataset reports via onError and is done.
+async function fetchDataset(def: GISDatasetDef, aoi: AoiQuery, handlers: GISDatasetHandlers): Promise<void> {
+  const url = def.buildUrl(aoi)
+  try {
+    const [data, wkid] = await Promise.all([
+      fetchJsonWithRetry(url, { validate: toFeatureCollection }),
+      lookupMapServerWkid(url),
+    ])
+    handlers.onDataset({ id: def.id, style: def.style, visibile: false, wkid, data })
+  } catch (err) {
+    handlers.onError(def.id, err instanceof Error ? err.message : 'request failed')
+  }
+}
+
 // Fetches every registered dataset for the AOI, streaming each result through
 // the handlers as it settles (instead of holding everything until the slowest
 // request finishes). Resolves once all datasets have settled. One dataset
 // failing doesn't block the others; each fetch retries transient failures
 // (timeouts, 5xx, and ArcGIS 200-with-error bodies).
+//
+// The static registry and the backend's catalog are independent, so they run as
+// two concurrent waves: the registry's datasets start immediately, and the
+// backend's layers join the fan-out once discovery returns. Discovery is a slow
+// step to sit behind — it retries with backoff against a 10s timeout — and
+// nothing in the registry depends on its result. If it fails outright (backend
+// down), the registry's datasets still load.
 export async function fetchGISDatasets(points: LatLngTuple[], handlers: GISDatasetHandlers): Promise<void> {
   const lats = points.map(([lat]) => lat)
   const lons = points.map(([, lng]) => lng)
@@ -330,30 +374,19 @@ export async function fetchGISDatasets(points: LatLngTuple[], handlers: GISDatas
     },
   }
 
-  // Static registry plus whatever the backend's catalog currently holds. If
-  // discovery fails (backend down), the remote datasets still load.
-  let defs = GIS_DATASETS
-  try {
-    defs = [...GIS_DATASETS, ...(await discoverBackendLayers())]
-  } catch (err) {
-    handlers.onError(null, `layer discovery: ${err instanceof Error ? err.message : 'failed'}`)
+  const fetchAll = (defs: GISDatasetDef[]) => {
+    if (defs.length === 0) return Promise.resolve([])
+    handlers.onStart(defs.map((def) => def.id))
+    return Promise.allSettled(defs.map((def) => fetchDataset(def, aoi, handlers)))
   }
 
-  handlers.onStart(defs.map((def) => def.id))
+  const registryWave = fetchAll(GIS_DATASETS)
+  const backendWave = discoverBackendLayers()
+    .then(fetchAll)
+    .catch((err) => {
+      handlers.onError(null, `layer discovery: ${err instanceof Error ? err.message : 'failed'}`)
+    })
 
-  await Promise.allSettled(
-    defs.map(async (def) => {
-      const url = def.buildUrl(aoi)
-      try {
-        const [data, wkid] = await Promise.all([
-          fetchJsonWithRetry(url, { validate: toFeatureCollection }),
-          lookupMapServerWkid(url),
-        ])
-        handlers.onDataset({ id: def.id, style: def.style, visibile: false, wkid, data })
-      } catch (err) {
-        handlers.onError(def.id, err instanceof Error ? err.message : 'request failed')
-      }
-    }),
-  )
+  await Promise.all([registryWave, backendWave])
 }
 

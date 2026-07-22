@@ -1,0 +1,30 @@
+.app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.header{
+   height: 50px;
+    width: 100%;
+    background-color: var(--primary-blue);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    /* Leaflet's controls sit at z-index 1000; lift the whole header so the
+       search results dropdown lands over the map instead of behind it. */
+    position: relative;
+    z-index: 1100;
+    gap:20px;
+    padding-left: 20px;
+}
+
+.map-area {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+}

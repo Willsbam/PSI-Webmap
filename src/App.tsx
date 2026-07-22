@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { LatLngTuple } from 'leaflet'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { LatLngBoundsExpression, LatLngTuple, Map as LeafletMap } from 'leaflet'
 import WebMap from './components/WebMap'
+import SearchBar from './components/SearchBar'
 import SidePanel from './components/SidePanel'
-import type { GISDataset, TnmItem } from './types'
+import type { GISDataset, TnmItem } from './lib/types'
 import * as nwf from './lib/nwf'
+import './App.css'
+import PSIlogo from './assets/PSILogo.png'
+
+
 function App() {
   //Networking is all handled at this top app level
   const [points, setPoints] = useState<LatLngTuple[]>([])
@@ -12,24 +17,35 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+
   const [gisDatasets, setGisDatasets] = useState<GISDataset[]>([])
-  // GIS/shapefile errors are kept separate from `error` (which is TNM/Lidar) so
-  // they surface under the Shapefiles tab rather than the Lidar tab.
   const [gisError, setGisError] = useState<string | null>(null)
-  // The GIS fetch runs after the TNM loop, so it needs its own loading flag —
-  // loadState (TNM/Lidar) reaching 2 doesn't mean the GIS datasets are in yet.
   const [gisLoading, setGisLoading] = useState(false)
   // Dataset ids whose fetch is still in flight; each is removed as its result
   // (or failure) streams in, so the panel can show per-dataset loading rows.
   const [gisPending, setGisPending] = useState<string[]>([])
+
   // react-leaflet's <GeoJSON> doesn't diff `data` after mount, so bump this on
   // each fetch to force a remount with the new coverage.
   const [gisKey, setGisKey] = useState(0)
-  // Which data tab is active. Drives both the side panel and which layers the
-  // map renders — lidar coverage is hidden while on the shapefiles tab.
   const [activeTab, setActiveTab] = useState<'lidar' | 'shapefiles'>('lidar')
   //0 -  nothing loaded, 1 loading, 2 - loaded,
   const loadState = useRef(0)
+  // Set by MapContainer once it mounts; lets the header's search bar move the map.
+  const mapRef = useRef<LeafletMap | null>(null)
+  // Identifies the current GIS fetch. The fetch outlives the code that started
+  // it (a reset can land while datasets are still streaming in), so every
+  // handler checks its run is still the current one before touching state —
+  // otherwise a superseded run repopulates the panel after it was cleared.
+  const gisRunId = useRef(0)
+
+  // A self-crossing ("bowtie") polygon is unusable — Esri rejects the ring —
+  // so the map shows an error and the search is blocked until it's redrawn.
+  const invalidPolygon = useMemo(() => nwf.isSelfIntersecting(points), [points])
+
+  const handleSelectLocation = useCallback((bounds: LatLngBoundsExpression) => {
+    mapRef.current?.flyToBounds(bounds)
+  }, [])
 
   const handleAddPoint = useCallback((point: LatLngTuple) => {
     setPoints((prev) => [...prev, point])
@@ -46,6 +62,7 @@ function App() {
   // Replaces the drawn polygon with one loaded from a .kmz, clearing prior results.
   const handleLoadPolygon = useCallback((polygon: LatLngTuple[]) => {
     loadState.current = 0
+    gisRunId.current += 1
     setItems([])
     setTotal(null)
     setError(null)
@@ -59,6 +76,7 @@ function App() {
 
   const handleReset = () => {
     loadState.current = 0
+    gisRunId.current += 1
     setPoints([])
     setItems([])
     setTotal(null)
@@ -71,9 +89,9 @@ function App() {
     setGisPending([])
   }
 
-  const processSelection = useCallback(async () => 
+  const processSelection = useCallback(async () =>
     {
-    if (points.length < 3) return
+    if (points.length < 3 || nwf.isSelfIntersecting(points)) return
 
     const polygon = points.map(([lat, lng]) => `${lng} ${lat}`).join(',')
 
@@ -85,6 +103,35 @@ function App() {
     setGisLoading(true)
     setPanelOpen(true)
     setSelectedItemId(null)
+
+    //The GIS datasets share nothing with the TNM query but the AOI, so they are
+    //started here and awaited at the end — they stream onto the map while the
+    //lidar pagination below is still running, instead of queueing behind it.
+    setGisDatasets([])
+    setGisPending([])
+    // Bump BEFORE arrivals so each streamed dataset mounts a fresh <GeoJSON>
+    // (its key is `${id}:${gisKey}`) instead of reusing a stale one.
+    setGisKey((k) => k + 1)
+
+    const runId = (gisRunId.current += 1)
+    const isCurrentRun = () => gisRunId.current === runId
+
+    const gisRun = nwf.fetchGISDatasets(points, {
+      onStart: (ids) => {
+        if (isCurrentRun()) setGisPending((prev) => [...prev, ...ids])
+      },
+      onDataset: (dataset) => {
+        if (!isCurrentRun()) return
+        setGisDatasets((prev) => [...prev, dataset])
+        setGisPending((prev) => prev.filter((id) => id !== dataset.id))
+      },
+      onError: (id, message) => {
+        if (!isCurrentRun()) return
+        const label = id ? `${id}: ${message}` : message
+        setGisError((prev) => (prev ? `${prev}; ${label}` : label))
+        if (id) setGisPending((prev) => prev.filter((p) => p !== id))
+      },
+    })
 
     let offset = 0
     let remoteTotal = Infinity
@@ -112,25 +159,11 @@ function App() {
 
     } 
 
-    //Every dataset registered in nwf.GIS_DATASETS (plus the backend catalog) is
-    //fetched for the AOI; each one is appended and drawn the moment it lands
-    //rather than waiting for the slowest request.
-    setGisDatasets([])
-    // Bump BEFORE arrivals so each streamed dataset mounts a fresh <GeoJSON>
-    // (its key is `${id}:${gisKey}`) instead of reusing a stale one.
-    setGisKey((k) => k + 1)
-    await nwf.fetchGISDatasets(points, {
-      onStart: (ids) => setGisPending(ids),
-      onDataset: (dataset) => {
-        setGisDatasets((prev) => [...prev, dataset])
-        setGisPending((prev) => prev.filter((id) => id !== dataset.id))
-      },
-      onError: (id, message) => {
-        const label = id ? `${id}: ${message}` : message
-        setGisError((prev) => (prev ? `${prev}; ${label}` : label))
-        if (id) setGisPending((prev) => prev.filter((p) => p !== id))
-      },
-    })
+    //Every dataset registered in nwf.GIS_DATASETS (plus the backend catalog) was
+    //kicked off above; each one is appended and drawn the moment it lands rather
+    //than waiting for the slowest request. This just waits out the stragglers.
+    await gisRun
+    if (!isCurrentRun()) return
     setGisPending([])
     setGisLoading(false)
   }, [points])
@@ -147,38 +180,49 @@ function App() {
   //Webmap handles the drawing of the polygon and the points,
   //Actual query is handled here, and then data displayed in sidepanel when there is data to displacy
   return (
-    <>
-      <WebMap
-        points={points}
-        items={items}
-        selectedItemId={selectedItemId}
-        onAddPoint={handleAddPoint}
-        onReset={handleReset}
-        onSelectItem={handleSelectItem}
-        gisDatasets={gisDatasets}
-        gisKey={gisKey}
-        showLidar={activeTab === 'lidar'}
-        onLoadPolygon={handleLoadPolygon}
-      />
-      {panelOpen && (
-        <SidePanel
+    <div className="app">
+
+      <div className="header">
+        <img style={{ height: '100%', width: 'auto' }} src={PSIlogo} alt="Logo" />
+        <h2 style={{ margin: 0, fontWeight:"normal" }}>PSI Lidar and Shapefile Explorer</h2>
+        <SearchBar onSelectLocation={handleSelectLocation} />
+      </div>
+
+      <div className="map-area">
+        <WebMap
+          points={points}
           items={items}
-          total={total}
-          loading={loadState.current}
-          error={error}
-          gisDatasets={gisDatasets}
-          gisError={gisError}
-          gisLoading={gisLoading}
-          gisPending={gisPending}
-          onToggleDataset={handleToggleDataset}
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
           selectedItemId={selectedItemId}
+          onAddPoint={handleAddPoint}
+          onReset={handleReset}
           onSelectItem={handleSelectItem}
-          onClose={() => setPanelOpen(false)}
+          gisDatasets={gisDatasets}
+          gisKey={gisKey}
+          showLidar={activeTab === 'lidar'}
+          onLoadPolygon={handleLoadPolygon}
+          mapRef={mapRef}
+          invalidPolygon={invalidPolygon}
         />
-      )}
-    </>
+        {panelOpen && (
+          <SidePanel
+            items={items}
+            total={total}
+            loading={loadState.current}
+            error={error}
+            gisDatasets={gisDatasets}
+            gisError={gisError}
+            gisLoading={gisLoading}
+            gisPending={gisPending}
+            onToggleDataset={handleToggleDataset}
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            selectedItemId={selectedItemId}
+            onSelectItem={handleSelectItem}
+            onClose={() => setPanelOpen(false)}
+          />
+        )}
+      </div>
+    </div>
   )
 }
 
