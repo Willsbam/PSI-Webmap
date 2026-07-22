@@ -54,3 +54,7 @@ Contains:
 - WebMap
 - Sidepanel
 
+
+### PasswordGate.tsx
+#### Description
+This is a purely front-end password block. Its not secure in any capacity, but its meant to stop normal people who stumble onto the site from using it. The password itself is stored in PasswordGate using a basic variable. Of note (for my personal reference), is "  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem(STORAGE_KEY) === 'true')". The sessionStorage.getItem(STORAGE_KEY) is how you make session variables which persist between reloads, and this clears whenever the tab is properly closed. Good to know in the future.
