@@ -29,6 +29,13 @@
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
+@media (max-width:830px)
+{
+  .controls{
+      top: 52px;
+
+  }
+}
 
 .reset:hover {
   border-color: #aa3bff;
@@ -44,4 +51,27 @@
 
 .hint.error {
   background-color: rgba(200, 40, 40, 0.85);
+}
+
+/* The hint is a real button so touch users can trigger the search; these
+   reset the browser's button chrome so it still reads as the same pill. */
+.hint-button {
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Narrow screens have no keyboard, so the hint asks for a tap instead. */
+.hint-narrow {
+  display: none;
+}
+
+@media (max-width: 830px) {
+  .hint-wide {
+    display: none;
+  }
+
+  .hint-narrow {
+    display: inline;
+  }
 }

@@ -57,9 +57,12 @@ interface WebMapProps {
   // the MapContainer, where useMap() isn't available.
   mapRef: RefObject<LeafletMap | null>
   invalidPolygon: boolean
+  // Runs the AOI search. Enter still triggers it, but touch devices have no
+  // keyboard, so the hint doubles as the tap target.
+  onSearch: () => void
 }
 
-function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,showLidar,onLoadPolygon,mapRef,invalidPolygon,}: WebMapProps) {
+function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gisDatasets,gisKey,showLidar,onLoadPolygon,mapRef,invalidPolygon,onSearch,}: WebMapProps) {
   return (
     <div id="map-shell">
       <MapContainer
@@ -98,7 +101,13 @@ function WebMap({points,items,selectedItemId,onAddPoint,onReset,onSelectItem,gis
           {invalidPolygon ? (
             <div className="hint error">Invalid geometry — please clear and redraw without crossing lines</div>
           ) : (
-            points.length >= 3 && <div className="hint">Press Enter to search this area</div>
+            points.length >= 3 && (
+              <button type="button" className="hint hint-button" onClick={onSearch}>
+                {/* Swapped by a CSS media query — narrow screens have no keyboard. */}
+                <span className="hint-wide">Press Enter to search this area</span>
+                <span className="hint-narrow">Tap to search this area</span>
+              </button>
+            )
           )}
         </div>
       )}

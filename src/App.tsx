@@ -183,8 +183,10 @@ function App() {
     <div className="app">
 
       <div className="header">
-        <img style={{ height: '100%', width: 'auto' }} src={PSIlogo} alt="Logo" />
-        <h2 style={{ margin: 0, fontWeight:"normal" }}>PSI Lidar and Shapefile Explorer</h2>
+        <div style={{display: 'flex', alignContent: 'center', height: '100', alignItems: 'center'}}>
+          <img style={{ height: '40px', width: 'auto' }} src={PSIlogo} alt="Logo" />
+        <h2 className="titleText" >PSI Lidar and Shapefile Explorer</h2>
+        </div>
         <SearchBar onSelectLocation={handleSelectLocation} />
       </div>
 
@@ -202,6 +204,7 @@ function App() {
           onLoadPolygon={handleLoadPolygon}
           mapRef={mapRef}
           invalidPolygon={invalidPolygon}
+          onSearch={processSelection}
         />
         {panelOpen && (
           <SidePanel

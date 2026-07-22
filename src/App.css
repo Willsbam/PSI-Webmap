@@ -11,6 +11,7 @@
     color: #fff;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
     padding: 5px;
     box-sizing: border-box;
@@ -27,4 +28,15 @@
     flex: 1;
     position: relative;
     min-height: 0;
+}
+.titleText{
+    margin: 0;
+    font-weight:normal;
+}
+@media (max-width:830px) {
+    .titleText{
+    margin: 0;
+    font-weight:normal;
+    font-size: 1.2em;
+}
 }

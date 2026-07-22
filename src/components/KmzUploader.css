@@ -20,6 +20,13 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   text-align: center;
 }
+@media (max-width:830px)
+{
+.kmz-button{
+    display: none;
+
+}
+}
 
 .kmz-button:hover {
   border-color: #aa3bff;

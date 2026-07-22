@@ -7,6 +7,12 @@
   flex-shrink: 0;
   width: 300px;
 }
+@media (max-width:830px) {
+    .search-bar{
+    margin-left: none;
+
+}
+}
 
 .search-bar-row {
   display: flex;
@@ -90,3 +96,4 @@
 .search-results li button:hover {
   background: rgba(170, 59, 255, 0.08);
 }
+
