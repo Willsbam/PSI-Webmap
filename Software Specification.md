@@ -8,6 +8,9 @@ This document's goal is to enable clear and concise understanding of both the st
 ### Overview
 The PSI Webmap is meant to be a highly adjustable data source that can be easily used by surveyors and drafters to get relevant public data, such as The National Map's Lidar data and various Shapefile hosted online, alongside custom shapefiles hosted by a a custom POSTGIS backend(Not written in this project). The idea was to save some of the geospatial teams time by creating this definitive source to point everyone else too, that can be then added onto based off company specific information.
 
+Of note is that to add more public datasets, all you need to do is follow the format listed in datasets.ts. Adding More to that list will automatically handle fetching more.
+
+
 ## Project Structure
  - App.tsx
  - main.tsx

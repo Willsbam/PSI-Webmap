@@ -5,6 +5,7 @@ import SearchBar from './components/SearchBar'
 import SidePanel from './components/SidePanel'
 import type { GISDataset, TnmItem } from './lib/types'
 import * as nwf from './lib/nwf'
+
 import './App.css'
 import PSIlogo from './assets/PSILogo.png'
 
